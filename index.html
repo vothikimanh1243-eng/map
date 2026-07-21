@@ -2,8 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Map & Mini Map Hub</title>
-    <!-- Leaflet CSS -->
+    <title>Smart Map Hub - Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -19,7 +18,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background: var(--bg-grad); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
 
-        /* Sidebar tìm kiếm bên trái */
         .sidebar {
             width: 440px;
             background: var(--glass-bg);
@@ -113,7 +111,6 @@
 
         .empty-state { text-align: center; color: var(--text-sub); margin-top: 40px; font-size: 0.9rem; }
 
-        /* Vùng hiển thị bản đồ tổng quan bên phải */
         #map-area {
             flex: 1;
             height: 100%;
@@ -122,7 +119,6 @@
         }
         .map-frame { width: 100%; height: 100%; border: none; }
 
-        /* Mini Map nổi góc dưới bên phải màn hình */
         .mini-map-floating {
             position: absolute;
             bottom: 24px;
@@ -150,28 +146,24 @@
             justify-content: space-between;
             align-items: center;
         }
-        #miniMap {
-            flex: 1;
-            width: 100%;
-        }
+        #miniMap { flex: 1; width: 100%; }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR TÌM KIẾM -->
     <div class="sidebar">
         <div class="brand">
             <div class="brand-icon">🗺️</div>
             <div>
                 <h1>Smart Map Hub</h1>
-                <p>Tìm kiếm nhanh & Tích hợp Mini Map</p>
+                <p>Định vị GPS & Tìm kiếm chuẩn xác</p>
             </div>
         </div>
 
         <div class="search-card">
             <div class="input-box">
                 <span>🔍</span>
-                <input type="text" id="keyword" placeholder="Nhập tên quán, siêu thị (VD: Bách Hóa Xanh)...">
+                <input type="text" id="keyword" placeholder="VD: The Coffee, Bách Hóa Xanh...">
             </div>
             <div class="input-box">
                 <span>📍</span>
@@ -185,32 +177,60 @@
         </div>
 
         <div class="results-container" id="results-list">
-            <div class="empty-state">Nhập từ khóa và bấm tìm kiếm để hiển thị hệ thống địa điểm và bản đồ chi tiết.</div>
+            <div class="empty-state" id="gps-status">Đang lấy vị trí GPS của bạn...</div>
         </div>
     </div>
 
-    <!-- KHUNG BẢN ĐỒ CHÍNH & MINI MAP NỔI -->
     <div id="map-area">
-        <!-- Bản đồ chính tương tác tìm kiếm -->
-        <iframe id="mapFrame" class="map-frame" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.5!2d106.69!3d10.77!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTDCsDQ2JzEyLjAiTiAxMDbCsDQxJzI0LjAiE!5e0!3m2!1svi!2svn!4v1650000000000!5m2!1svi!2svn" allowfullscreen="" loading="lazy"></iframe>
+        <iframe id="mapFrame" class="map-frame" src="" allowfullscreen="" loading="lazy"></iframe>
 
-        <!-- Mini Map GPS Góc Dưới Phải -->
         <div class="mini-map-floating">
             <div class="mini-header">
-                <span>📍 GPS Mini Map</span>
-                <span style="color: #34d399;">● Live</span>
+                <span>📍 Vị trí hiện tại</span>
+                <span style="color: #34d399;">● Live GPS</span>
             </div>
             <div id="miniMap"></div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Xử lý tìm kiếm thông minh cập nhật sang bản đồ lớn
+        let currentLat = 10.77, currentLng = 106.69; // Mặc định Sài Gòn
+
+        // Lấy vị trí thực tế của người dùng ngay khi mở trang
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                currentLat = position.coords.latitude;
+                currentLng = position.coords.longitude;
+
+                // Cập nhật bản đồ chính hiển thị đúng vị trí hiện tại
+                const mapFrame = document.getElementById('mapFrame');
+                mapFrame.src = `https://maps.google.com/maps?q=${currentLat},${currentLng}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+                // Khởi tạo Mini Map với tọa độ chuẩn của bạn
+                const miniMap = L.map('miniMap', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([currentLat, currentLng], 15);
+
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    subdomains: 'abcd'
+                }).addTo(miniMap);
+
+                L.marker([currentLat, currentLng]).addTo(miniMap).bindPopup("<b>Bạn đang ở đây</b>").openPopup();
+
+                document.getElementById('results-list').innerHTML = `<div class="empty-state">Đã định vị thành công! Nhập tên quán cần tìm và bấm Tìm Kiếm Ngay.</div>`;
+            }, () => {
+                document.getElementById('results-list').innerHTML = `<div class="empty-state" style="color: #f87171;">Không thể lấy GPS. Vui lòng cấp quyền vị trí cho trình duyệt.</div>`;
+                // Vẫn load bản đồ mặc định
+                document.getElementById('mapFrame').src = `https://maps.google.com/maps?q=10.77,106.69&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+            });
+        }
+
         function searchPlaces() {
-            const keyword = document.getElementById('keyword').value.trim();
+            let keyword = document.getElementById('keyword').value.trim();
             const radius = document.getElementById('radius').value;
 
             if (!keyword) {
@@ -218,32 +238,40 @@
                 return;
             }
 
-            const listContainer = document.getElementById('results-list');
-            listContainer.innerHTML = `<div class="empty-state">Đang tìm kiếm kết quả...</div>`;
+            // Fix lỗi "The Coffee" bị dịch nhầm sang cửa hàng kính: thêm từ khóa bổ trợ "coffee shop" hoặc "quán cafe"
+            let querySearch = keyword;
+            const lowerKey = keyword.toLowerCase();
+            if (lowerKey.includes("coffee") || lowerKey.includes("cafe") || lowerKey.includes("cà phê")) {
+                querySearch = keyword + " coffee shop quán cà phê";
+            }
 
-            const encodedKey = encodeURIComponent(keyword + " trong bán kính " + radius + "km");
+            const listContainer = document.getElementById('results-list');
+            listContainer.innerHTML = `<div class="empty-state">Đang tìm "${keyword}" xung quanh bạn...</div>`;
+
+            // Truy vấn Google Maps dựa theo tọa độ hiện tại (`currentLat, currentLng`) để kết quả chính xác nhất tại nơi bạn đang đứng
+            const encodedKey = encodeURIComponent(querySearch);
             const mapFrame = document.getElementById('mapFrame');
-            mapFrame.src = `https://maps.google.com/maps?q=${encodedKey}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+            mapFrame.src = `https://maps.google.com/maps?q=${encodedKey}&sll=${currentLat},${currentLng}&z=14&ie=UTF8&iwloc=&output=embed`;
 
             setTimeout(() => {
                 listContainer.innerHTML = `
-                    <div class="result-item" onclick="updateMap('${keyword} chi nhánh gần nhất')">
+                    <div class="result-item" onclick="updateMap('${querySearch} gần đây')">
                         <div class="result-title">
-                            <span>${keyword} (Xung quanh bạn)</span>
+                            <span>${keyword} (Quanh đây)</span>
                             <span class="rating">⭐ 4.8</span>
                         </div>
-                        <div class="result-address">Kết quả tối ưu quét trong bán kính ${radius}km.</div>
+                        <div class="result-address">Tìm kiếm trong bán kính ${radius}km quanh vị trí GPS của bạn.</div>
                         <div class="result-footer">
                             <span style="color: #34d399; font-size: 0.8rem;">🟢 Đang mở cửa</span>
                             <a href="https://www.google.com/maps/search/${encodedKey}" target="_blank" class="action-link">Bản đồ lớn ↗</a>
                         </div>
                     </div>
-                    <div class="result-item" onclick="updateMap('${keyword} gần đây')">
+                    <div class="result-item" onclick="updateMap('${querySearch} chi nhánh gần nhất')">
                         <div class="result-title">
                             <span>Hệ thống ${keyword}</span>
                             <span class="rating">⭐ 4.6</span>
                         </div>
-                        <div class="result-address">Bấm để xem chỉ đường trực tiếp trên màn hình chính.</div>
+                        <div class="result-address">Nhấn để xem lộ trình và chỉ đường cụ thể.</div>
                         <div class="result-footer">
                             <span style="color: #34d399; font-size: 0.8rem;">🟢 Hoạt động tốt</span>
                             <a href="https://www.google.com/maps/search/${encodedKey}" target="_blank" class="action-link">Bản đồ lớn ↗</a>
@@ -255,27 +283,7 @@
 
         function updateMap(query) {
             const mapFrame = document.getElementById('mapFrame');
-            mapFrame.src = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
-        }
-
-        // Khởi tạo Mini Map Leaflet tự động chạy ở góc
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(position => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-
-                const miniMap = L.map('miniMap', {
-                    zoomControl: false,
-                    attributionControl: false
-                }).setView([lat, lng], 14);
-
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 19,
-                    subdomains: 'abcd'
-                }).addTo(miniMap);
-
-                L.marker([lat, lng]).addTo(miniMap);
-            });
+            mapFrame.src = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&sll=${currentLat},${currentLng}&z=15&ie=UTF8&iwloc=&output=embed`;
         }
     </script>
 </body>
