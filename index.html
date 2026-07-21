@@ -2,8 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Map Explorer - Free</title>
-    <!-- Leaflet CSS -->
+    <title>Smart Map Free - Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -119,14 +118,14 @@
             <div class="brand-icon">🗺️</div>
             <div>
                 <h1>Smart Map Free</h1>
-                <p>Khám phá ẩm thực hoàn toàn miễn phí</p>
+                <p>Khám phá ẩm thực & cửa hàng hoàn toàn miễn phí</p>
             </div>
         </div>
 
         <div class="search-card">
             <div class="input-box">
                 <span>🔍</span>
-                <input type="text" id="keyword" placeholder="Nhập tên quán, món ăn (VD: Phở, Coffee)...">
+                <input type="text" id="keyword" placeholder="Nhập tên quán, cửa hàng (VD: Bách Hóa Xanh)...">
             </div>
             <div class="input-box">
                 <span>📍</span>
@@ -146,14 +145,12 @@
 
     <div id="map"></div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
         let map, currentLat, currentLng;
         let markersLayer = L.layerGroup();
 
-        // Khởi tạo bản đồ OpenStreetMap
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
                 currentLat = position.coords.latitude;
@@ -161,7 +158,6 @@
 
                 map = L.map('map').setView([currentLat, currentLng], 14);
 
-                // Dùng nền bản đồ tối CartoDB Dark Matter cực đẹp
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     maxZoom: 19,
                     subdomains: 'abcd'
@@ -169,7 +165,6 @@
 
                 markersLayer.addTo(map);
 
-                // Đánh dấu vị trí của bạn
                 L.marker([currentLat, currentLng]).addTo(map)
                     .bindPopup("<b>Vị trí của bạn</b>").openPopup();
 
@@ -180,9 +175,25 @@
             alert("Trình duyệt không hỗ trợ định vị.");
         }
 
+        // Hàm tính khoảng cách giữa 2 tọa độ (Hệ mét)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
         async function searchPlaces() {
             const keyword = document.getElementById('keyword').value.trim();
-            const radiusMeters = parseInt(document.getElementById('radius').value);
+            const maxRadius = parseInt(document.getElementById('radius').value);
 
             if (!keyword) {
                 alert("Vui lòng nhập từ khóa tìm kiếm!");
@@ -191,38 +202,38 @@
 
             markersLayer.clearLayers();
             const listContainer = document.getElementById('results-list');
-            listContainer.innerHTML = `<div class="empty-state">Đang tìm kiếm...</div>`;
+            listContainer.innerHTML = `<div class="empty-state">Đang tìm kiếm trong bán kính ${maxRadius/1000}km...</div>`;
 
-            // Sử dụng Nominatim API của OpenStreetMap để tìm kiếm địa điểm dựa theo từ khóa và tọa độ
-            // Chuyển bán kính mét sang độ (tạm tính: 1 độ ~ 111km)
-            const degRadius = radiusMeters / 111000;
-            const viewbox = `${currentLng - degRadius},${currentLat + degRadius},${currentLng + degRadius},${currentLat - degRadius}`;
-            
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(keyword)}&bounded=1&viewbox=${viewbox}&limit=20`;
+            // Tìm kiếm rộng toàn quốc/tỉnh thành trước rồi lọc chuẩn theo bán kính thực tế qua tọa độ
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(keyword)}&countrycodes=vn&limit=40`;
 
             try {
                 const response = await fetch(url);
                 const data = await response.json();
 
                 listContainer.innerHTML = '';
+                let count = 0;
 
-                if (data.length > 0) {
-                    data.forEach(place => {
-                        const lat = parseFloat(place.lat);
-                        const lon = parseFloat(place.lon);
+                data.forEach(place => {
+                    const lat = parseFloat(place.lat);
+                    const lon = parseFloat(place.lon);
 
-                        // Tạo marker trên bản đồ
+                    // Tính khoảng cách thực tế từ vị trí hiện tại đến địa điểm
+                    const distance = getDistance(currentLat, currentLng, lat, lon);
+
+                    // Chỉ lấy những điểm nằm trong bán kính người dùng chọn (VD: 20000m)
+                    if (distance <= maxRadius) {
+                        count++;
                         const marker = L.marker([lat, lon]).addTo(markersLayer);
-                        marker.bindPopup(`<b>${place.display_name}</b>`);
+                        marker.bindPopup(`<b>${place.display_name}</b><br>Cách bạn: ${(distance/1000).toFixed(1)} km`);
 
-                        // Thêm vào danh sách sidebar
                         const div = document.createElement('div');
                         div.className = 'result-item';
                         div.innerHTML = `
                             <div class="result-title">${place.display_name.split(',')[0]}</div>
                             <div class="result-address">${place.display_name}</div>
                             <div class="result-footer">
-                                <div class="rating">⭐ 4.5 (Miễn phí từ OSM)</div>
+                                <div class="rating">📍 Cách bạn ${(distance/1000).toFixed(1)} km</div>
                             </div>
                         `;
                         div.onclick = () => {
@@ -230,9 +241,11 @@
                             marker.openPopup();
                         };
                         listContainer.appendChild(div);
-                    });
-                } else {
-                    listContainer.innerHTML = `<div class="empty-state" style="color: #f87171;">Không tìm thấy địa điểm nào trong bán kính này.</div>`;
+                    }
+                });
+
+                if (count === 0) {
+                    listContainer.innerHTML = `<div class="empty-state" style="color: #f87171;">Không tìm thấy kết quả nào trong bán kính ${maxRadius/1000}km này. Hãy thử tăng bán kính hoặc đổi từ khóa khác!</div>`;
                 }
             } catch (error) {
                 listContainer.innerHTML = `<div class="empty-state" style="color: #f87171;">Lỗi kết nối dữ liệu bản đồ.</div>`;
